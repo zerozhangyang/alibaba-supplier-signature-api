@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>签名报备运维台</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:#f3f5f7;color:#1f2329;padding:18px;min-width:1400px}
+.header,.toolbar,.table-wrap,.panel,.pager{background:#fff;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.header{padding:18px 22px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+.header h1{font-size:20px}
+.header input{width:260px;border:1px solid #d9d9d9;border-radius:6px;padding:6px 10px}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px}
+.stat{background:#fff;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.06);padding:16px 18px}
+.stat b{display:block;font-size:26px;margin-bottom:4px}
+.stat span{font-size:12px;color:#7a7f87}
+.toolbar{padding:14px 18px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.toolbar label{font-size:13px;color:#69707a}
+.toolbar input,.toolbar select,.toolbar button,.toolbar textarea{border:1px solid #d9d9d9;border-radius:6px;padding:7px 10px;font-size:13px}
+.toolbar button,.btn{cursor:pointer;background:#1677ff;color:#fff;border-color:#1677ff}
+.toolbar button.secondary,.btn.secondary{background:#fff;color:#445;border-color:#d9d9d9}
+.table-wrap{overflow:auto}
+table{width:100%;min-width:1700px;border-collapse:collapse;font-size:13px}
+th,td{padding:11px 10px;border-bottom:1px solid #edf0f2;text-align:left;vertical-align:top}
+th{background:#fafbfc;color:#69707a;position:sticky;top:0}
+tr:hover{background:#fafcff}
+.badge{display:inline-block;border-radius:999px;padding:2px 8px;font-size:12px}
+.ok{background:#e8f7ee;color:#1a7f37}
+.fail{background:#fff1f0;color:#cf1322}
+.pending{background:#e6f4ff;color:#0958d9}
+.neutral{background:#f2f3f5;color:#4e5969}
+.actions .btn{margin-right:6px;margin-bottom:4px;padding:5px 10px;font-size:12px}
+.pager{padding:12px 18px;margin-top:12px;display:flex;justify-content:space-between;align-items:center}
+.modal-mask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center}
+.modal-mask.show{display:flex}
+.modal{background:#fff;border-radius:12px;width:900px;max-height:88vh;overflow:auto;padding:18px 20px}
+.modal.small{width:620px}
+.modal h3{font-size:17px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px}
+.field label{display:block;font-size:12px;color:#7a7f87;margin-bottom:4px}
+.field input,.field select,.field textarea{width:100%;border:1px solid #d9d9d9;border-radius:6px;padding:8px 10px;font-size:13px}
+.field textarea{min-height:72px}
+.section-title{font-size:14px;font-weight:700;margin:18px 0 10px}
+.kv{display:grid;grid-template-columns:160px 1fr;border-top:1px solid #edf0f2}
+.kv div{padding:8px 10px;border-bottom:1px solid #edf0f2}
+.kv .k{background:#fafbfc;color:#69707a}
+.result-box{background:#f7f8fa;border-radius:8px;padding:10px;font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;display:none;margin-top:10px}
+.split{display:grid;grid-template-columns:1.3fr .7fr;gap:14px}
+.panel{padding:14px 16px}
+.panel table{min-width:0}
+.link{color:#1677ff;text-decoration:none;word-break:break-all}
+.muted{color:#7a7f87}
+.export-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.export-field-list{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 14px;max-height:360px;overflow:auto;padding:6px 2px}
+.export-field-item{display:flex;align-items:center;gap:8px;font-size:13px;color:#1f2329}
+.export-field-item input{margin:0}
+.btn:disabled,.toolbar button:disabled{cursor:not-allowed;opacity:.55}
+.batch-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0}
+.batch-summary div{background:#f7f8fa;border-radius:8px;padding:10px 12px}
+.batch-summary b{display:block;font-size:20px;margin-bottom:2px}
+.batch-summary span{font-size:12px;color:#7a7f87}
+.batch-table{max-height:420px;overflow:auto;border:1px solid #edf0f2;border-radius:8px}
+.batch-table table{min-width:1200px}
+.batch-table td,.batch-table th{padding:8px 10px}
+.batch-row-ready{color:#1a7f37}
+.batch-row-skip{color:#7a7f87}
+.batch-row-error{color:#cf1322}
+.batch-row-done{color:#0958d9}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>签名报备运维台</h1>
+  <div>服务地址 <input id="baseUrl" value=""></div>
+</div>
+
+<div class="stats">
+  <div class="stat"><b id="statTotal">-</b><span>总数</span></div>
+  <div class="stat"><b id="statPending">-</b><span>待回传</span></div>
+  <div class="stat"><b id="statCallbackFail">-</b><span>回传失败</span></div>
+  <div class="stat"><b id="statSubmitFail">-</b><span>修正失败</span></div>
+  <div class="stat"><b id="statQueryFail">-</b><span>查询异常</span></div>
+</div>
+
+<div class="toolbar">
+  <label>类型</label>
+  <select id="filterType"><option value="">全部</option><option value="third">三方资源</option><option value="direct">直连供应商</option></select>
+  <label>主状态</label>
+  <select id="filterStatus"><option value="">全部</option><option value="RECEIVED">待处理</option><option value="CALLBACK_SUCCESS">回传成功</option><option value="CALLBACK_FAIL">回传失败</option><option value="SUBMIT_SUCCESS">修正成功</option><option value="SUBMIT_FAIL">修正失败</option></select>
+  <label>回传</label>
+  <select id="filterCallbackStatus"><option value="">全部</option><option value="CALLBACK_SUCCESS">成功</option><option value="CALLBACK_FAIL">失败</option></select>
+  <label>修正</label>
+  <select id="filterSubmitStatus"><option value="">全部</option><option value="SUBMIT_SUCCESS">成功</option><option value="SUBMIT_FAIL">失败</option></select>
+  <label>查询</label>
+  <select id="filterQueryStatus"><option value="">全部</option><option value="QUERY_SUCCESS">成功</option><option value="QUERY_FAIL">失败</option></select>
+  <label>时间</label>
+  <input type="date" id="startDate">
+  <input type="date" id="endDate">
+  <label>搜索</label>
+  <input type="text" id="keyword" placeholder="签名/账号/FlowId/企业名">
+  <button onclick="currentPage=1;loadTasks()">查询</button>
+  <button class="secondary" onclick="resetFilters()">重置</button>
+  <button class="secondary" id="exportAllBtn" onclick="exportAllDetails()">导出当前筛选全部详情</button>
+  <button class="secondary" id="callbackTemplateBtn" onclick="exportCallbackTemplate()">导出回传模板</button>
+  <button class="secondary" id="callbackImportBtn" onclick="$('callbackImportFile').click()">导入回传CSV</button>
+  <input type="file" id="callbackImportFile" accept=".csv,text/csv" style="display:none" onchange="handleCallbackCsvFile(event)">
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>FlowId</th>
+        <th>类型</th>
+        <th>签名</th>
+        <th>账号</th>
+        <th>扩展码/子端口</th>
+        <th>企业</th>
+        <th>产品/优先级</th>
+        <th>接收状态</th>
+        <th>回传状态</th>
+        <th>修正状态</th>
+        <th>查询状态</th>
+        <th>查询摘要</th>
+        <th>接收时间</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody id="taskList"></tbody>
+  </table>
+</div>
+
+<div class="pager">
+  <div id="pageInfo"></div>
+  <div style="display:flex;align-items:center;gap:14px">
+    <span id="pageSizeInfo">每页100条</span>
+    <div>
+    <button class="btn secondary" id="prevBtn" onclick="changePage(-1)">上一页</button>
+    <span id="pageNum" style="margin:0 8px"></span>
+    <button class="btn secondary" id="nextBtn" onclick="changePage(1)">下一页</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-mask" id="detailModal">
+  <div class="modal">
+    <h3>任务详情</h3>
+    <div class="split">
+      <div class="panel">
+        <div class="section-title">基础信息</div>
+        <div class="kv" id="detailTask"></div>
+        <div class="section-title">结果快照</div>
+        <div class="kv" id="detailSnapshots"></div>
+        <div class="section-title">运营商结果</div>
+        <table><thead><tr><th>来源</th><th>运营商</th><th>状态</th><th>错误码</th><th>错误说明</th></tr></thead><tbody id="detailVendor"></tbody></table>
+      </div>
+      <div class="panel">
+        <div class="section-title">事件日志</div>
+        <table><thead><tr><th>事件</th><th>请求ID</th><th>结果</th><th>时间</th></tr></thead><tbody id="detailEvents"></tbody></table>
+      </div>
+    </div>
+    <div style="margin-top:16px;text-align:right">
+      <button class="btn secondary" onclick="exportDetail()">导出详情</button>
+      <button class="btn secondary" onclick="closeModal('detailModal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-mask" id="callbackModal">
+  <div class="modal small">
+    <h3>回传报备结果</h3>
+    <input type="hidden" id="cbFlowId"><input type="hidden" id="cbType">
+    <div class="grid">
+      <div class="field"><label>报备结果</label><select id="cbStatus" onchange="toggleSubPort('cb')"><option value="1">1 能发且透传</option><option value="2">2 能发不保证透传</option><option value="3">3 不能发</option></select></div>
+      <div class="field" id="cbSubWrap"><label>实际子端口</label><input id="cbSubSmsPort"></div>
+      <div class="field"><label>失败说明</label><input id="cbDesc"></div>
+    </div>
+    <div class="section-title">运营商结果</div>
+    <div class="grid">
+      <div class="field"><label>移动</label><select id="cbYd"><option value="1">成功</option><option value="2">失败</option></select></div>
+      <div class="field"><label>联通</label><select id="cbLt"><option value="1">成功</option><option value="2">失败</option></select></div>
+      <div class="field"><label>电信</label><select id="cbDx"><option value="1">成功</option><option value="2">失败</option></select></div>
+    </div>
+    <div class="result-box" id="cbResult"></div>
+    <div style="margin-top:16px;text-align:right"><button class="btn secondary" onclick="closeModal('callbackModal')">取消</button> <button class="btn" onclick="doCallback()">确认回传</button></div>
+  </div>
+</div>
+
+<div class="modal-mask" id="submitModal">
+  <div class="modal small">
+    <h3>修正报备结果</h3>
+    <input type="hidden" id="subFlowId">
+    <div class="muted" style="margin-bottom:10px">同一报备项 7 天仅能修正一次，且不能从成功改失败。</div>
+    <div class="grid">
+      <div class="field"><label>报备结果</label><select id="subStatus" onchange="toggleSubPort('sub')"><option value="1">1 能发且透传</option><option value="2">2 能发不保证透传</option><option value="3">3 不能发</option></select></div>
+      <div class="field" id="subSubWrap"><label>实际子端口</label><input id="subSubSmsPort"></div>
+      <div class="field"><label>失败说明</label><input id="subDesc"></div>
+    </div>
+    <div class="section-title">运营商结果</div>
+    <div class="grid">
+      <div class="field"><label>移动</label><select id="subYd"><option value="1">成功</option><option value="2">失败</option></select></div>
+      <div class="field"><label>联通</label><select id="subLt"><option value="1">成功</option><option value="2">失败</option></select></div>
+      <div class="field"><label>电信</label><select id="subDx"><option value="1">成功</option><option value="2">失败</option></select></div>
+    </div>
+    <div class="result-box" id="subResult"></div>
+    <div style="margin-top:16px;text-align:right"><button class="btn secondary" onclick="closeModal('submitModal')">取消</button> <button class="btn" onclick="doSubmit()">确认修正</button></div>
+  </div>
+</div>
+
+<div class="modal-mask" id="queryModal">
+  <div class="modal small">
+    <h3>查询报备结果</h3>
+    <input type="hidden" id="queryFlowId">
+    <div class="grid">
+      <div class="field"><label>账号</label><input id="queryAccount"></div>
+      <div class="field"><label>签名</label><input id="querySignature"></div>
+      <div class="field"><label>优先级</label><input id="queryPriority"></div>
+      <div class="field"><label>报备类型</label><input id="queryRegisterType"></div>
+    </div>
+    <div class="result-box" id="queryResult"></div>
+    <div style="margin-top:16px;text-align:right"><button class="btn secondary" onclick="closeModal('queryModal')">取消</button> <button class="btn" onclick="doQuery()">执行查询</button></div>
+  </div>
+</div>
+
+<div class="modal-mask" id="exportFieldsModal">
+  <div class="modal small">
+    <h3>选择导出字段</h3>
+    <div class="export-toolbar">
+      <div class="muted">默认勾选常用字段，可按需调整后导出 CSV</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn secondary" type="button" onclick="setAllExportFields(true)">全选</button>
+        <button class="btn secondary" type="button" onclick="setAllExportFields(false)">取消全选</button>
+        <button class="btn secondary" type="button" onclick="resetExportFieldSelection()">恢复默认</button>
+      </div>
+    </div>
+    <div class="export-field-list" id="exportFieldList"></div>
+    <div style="margin-top:16px;text-align:right">
+      <button class="btn secondary" type="button" onclick="closeModal('exportFieldsModal')">取消</button>
+      <button class="btn" id="exportConfirmBtn" type="button" onclick="confirmExportAllDetails()">确认导出</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-mask" id="batchCallbackModal">
+  <div class="modal">
+    <h3>批量回传预览</h3>
+    <div class="muted" id="batchCallbackHint">导入后会先校验，确认后逐条回传。</div>
+    <div class="batch-summary">
+      <div><b id="batchTotal">0</b><span>总行数</span></div>
+      <div><b id="batchReady">0</b><span>可回传</span></div>
+      <div><b id="batchSkipped">0</b><span>跳过</span></div>
+      <div><b id="batchErrors">0</b><span>错误</span></div>
+    </div>
+    <div class="batch-table">
+      <table>
+        <thead><tr><th>行号</th><th>FlowId</th><th>签名</th><th>账号</th><th>类型</th><th>报备结果</th><th>运营商结果</th><th>状态</th><th>说明</th></tr></thead>
+        <tbody id="batchCallbackList"></tbody>
+      </table>
+    </div>
+    <div class="result-box" id="batchCallbackResult"></div>
+    <div style="margin-top:16px;text-align:right">
+      <button class="btn secondary" type="button" onclick="closeModal('batchCallbackModal')">关闭</button>
+      <button class="btn" id="batchCallbackConfirmBtn" type="button" onclick="runBatchCallback()">确认批量回传</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var currentPage=1,pageSize=100,totalCount=0,taskCache=[],currentDetailData=null,batchCallbackRows=[],batchCallbackRunning=false;
+var supplierTypeMap={third:'三方资源',direct:'直连供应商'};
+var signSourceMap={"0":"企事业单位","1":"工信部备案网站","2":"App","3":"公众号/小程序","4":"电商店铺","5":"商标名","6":"线上试用"};
+var produceMap={"0":"通知","1":"营销","2":"验证码","3":"全部"};
+var industryMap={"0":"物流"};
+var registerMap={0:"必须报备",1:"弹性报备","0":"必须报备","1":"弹性报备"};
+var priorityMap={P0:"P0（0-1天）",P1:"P1（1-2天）",P2:"P2（2-3天）",P3:"P3（3-5天）"};
+var certTypeMap={
+  CN_ID_CARD:"中国居民身份证",
+  PASSPORT:"护照",
+  HOME_RETURN_PERMIT:"港澳居民来往内地通行证",
+  TAIWAN_COMPATRIOT_PERMIT:"台湾居民来往大陆通行证",
+  RESIDENCE_PERMIT:"港澳台居民居住证",
+  OTHER:"其他"
+};
+var sourceTypeMap={callback:'回传结果',submit:'修正结果',query:'查询结果'};
+var directionMap={inbound:'入站',outbound:'出站'};
+var mainStatusMap={
+  RECEIVED:'待处理',
+  CALLBACK_SUCCESS:'回传成功',
+  CALLBACK_FAIL:'回传失败',
+  SUBMIT_SUCCESS:'修正成功',
+  SUBMIT_FAIL:'修正失败',
+  QUERY_SUCCESS:'查询成功',
+  QUERY_FAIL:'查询失败'
+};
+var exportFieldDefs=[
+  {key:'flowId',label:'FlowId',selected:true,getter:function(task){return displayValue(task.flowId)}},
+  {key:'supplierType',label:'\u7c7b\u578b',selected:true,getter:function(task){return formatSupplierType(task.supplierType)}},
+  {key:'signature',label:'\u7b7e\u540d',selected:true,getter:function(task){return displayValue(task.signature)}},
+  {key:'account',label:'\u8d26\u53f7',selected:true,getter:function(task){return displayValue(task.account)}},
+  {key:'extCode',label:'\u6269\u5c55\u7801',selected:true,getter:function(task){return task.supplierType==='third'?displayValue(task.extCode):''}},
+  {key:'subSmsPort',label:'\u5b50\u7aef\u53e3',selected:true,getter:function(task){return task.supplierType==='direct'?displayValue(task.subSmsPort):''}},
+  {key:'companyName',label:'\u4f01\u4e1a\u540d\u79f0',selected:true,getter:function(task){return displayValue(task.companyName)}},
+  {key:'organizationCode',label:'\u7edf\u4e00\u793e\u4f1a\u4fe1\u7528\u4ee3\u7801',selected:true,getter:function(task){return displayValue(task.organizationCode)}},
+  {key:'signSource',label:'\u7b7e\u540d\u6765\u6e90',selected:true,getter:function(task){return formatSignSource(task.signSource)}},
+  {key:'applySceneContent',label:'\u5e94\u7528\u573a\u666f',selected:true,getter:function(task){return displayValue(task.applySceneContent)}},
+  {key:'registName',label:'\u8d23\u4efb\u4eba',selected:true,getter:function(task){return displayValue(task.registName)}},
+  {key:'registCert',label:'\u8d23\u4efb\u4eba\u8bc1\u4ef6',selected:true,getter:function(task){return formatCertInfo(task.registCertType,task.registCertId)}},
+  {key:'legalName',label:'\u6cd5\u4eba',selected:true,getter:function(task){return displayValue(task.legalName)}},
+  {key:'legalCert',label:'\u6cd5\u4eba\u8bc1\u4ef6',selected:true,getter:function(task){return formatCertInfo(task.legalCertType,task.legalCertId)}},
+  {key:'agencyName',label:'\u7ecf\u529e\u4eba',selected:true,getter:function(task){return displayValue(task.agencyName)}},
+  {key:'agencyCert',label:'\u7ecf\u529e\u4eba\u8bc1\u4ef6',selected:true,getter:function(task){return formatCertInfo(task.agencyCertType,task.agencyCertId)}},
+  {key:'produceType',label:'\u4ea7\u54c1\u7c7b\u578b',selected:true,getter:function(task){return formatProduceType(task.produceType)}},
+  {key:'industryType',label:'\u884c\u4e1a\u7c7b\u578b',selected:true,getter:function(task){return formatIndustryType(task.industryType)}},
+  {key:'registerType',label:'\u62a5\u5907\u7c7b\u578b',selected:true,getter:function(task){return formatRegisterType(task.registerType)}},
+  {key:'priority',label:'\u4f18\u5148\u7ea7',selected:true,getter:function(task){return formatPriority(task.priority)}},
+  {key:'status',label:'\u5f53\u524d\u72b6\u6001',selected:true,getter:function(task){return formatMainStatus(task.status)}},
+  {key:'callbackStatus',label:'\u56de\u4f20\u72b6\u6001',selected:true,getter:function(task){return formatMainStatus(task.callbackStatus)}},
+  {key:'submitStatus',label:'\u4fee\u6b63\u72b6\u6001',selected:true,getter:function(task){return formatMainStatus(task.submitStatus)}},
+  {key:'queryStatus',label:'\u67e5\u8be2\u72b6\u6001',selected:true,getter:function(task){return formatMainStatus(task.queryStatus)}},
+  {key:'signCertificatePic',label:'\u7b7e\u540d\u8bc1\u660e',selected:true,getter:function(task){return displayValue(task.signCertificatePic)}},
+  {key:'businessLicensePic',label:'\u8425\u4e1a\u6267\u7167',selected:true,getter:function(task){return displayValue(task.businessLicensePic)}},
+  {key:'errorCode',label:'\u9519\u8bef\u7801',selected:true,getter:function(task){return displayValue(task.errorCode)}},
+  {key:'errorMsg',label:'\u9519\u8bef\u4fe1\u606f',selected:true,getter:function(task){return displayValue(task.errorMsg)}}
+];
+var exportFieldDefaults=exportFieldDefs.filter(function(item){return item.selected;}).map(function(item){return item.key});
+function $(id){return document.getElementById(id)}
+function val(id){return $(id).value.trim()}
+function esc(v){var d=document.createElement('div');d.textContent=v==null?'':String(v);return d.innerHTML}
+function closeModal(id){$(id).classList.remove('show')}
+function openModal(id){$(id).classList.add('show')}
+function api(method,path,body){
+  var url=val('baseUrl').replace(/\/$/,'')+path;
+  var opts={method:method,headers:{'Content-Type':'application/json'}};
+  if(body)opts.body=JSON.stringify(body);
+  return fetch(url,opts).then(function(r){return r.json()});
+}
+function badge(text,type){return '<span class="badge '+type+'">'+esc(text||'-')+'</span>'}
+function displayValue(v){
+  return v==null||v===''||v==='null'||v==='undefined' ? '-' : v;
+}
+function formatByMap(value, map){
+  if(value==null||value==='')return '-';
+  var key=String(value);
+  return map.hasOwnProperty(key)?map[key]:value;
+}
+function formatSupplierType(value){return formatByMap(value, supplierTypeMap)}
+function formatSignSource(value){return formatByMap(value, signSourceMap)}
+function formatProduceType(value){return formatByMap(value, produceMap)}
+function formatIndustryType(value){return formatByMap(value, industryMap)}
+function formatRegisterType(value){return formatByMap(value, registerMap)}
+function formatPriority(value){return formatByMap(value, priorityMap)}
+function formatCertType(value){return formatByMap(value, certTypeMap)}
+function formatVendorStatus(value){
+  if(value===1||value==='1')return '成功';
+  if(value===2||value==='2')return '失败';
+  return displayValue(value);
+}
+function formatSourceType(value){return formatByMap(value, sourceTypeMap)}
+function formatDirection(value){return formatByMap(value, directionMap)}
+function formatMainStatus(value){return formatByMap(value, mainStatusMap)}
+function formatCertInfo(type,id){
+  var t=formatCertType(type), i=displayValue(id);
+  if(t==='-'&&i==='-')return '-';
+  if(t==='-')return i;
+  if(i==='-')return t;
+  return t+' / '+i;
+}
+function stateBadge(v){
+  if(!v)return badge('-', 'neutral');
+  var label=formatMainStatus(v);
+  if(String(v).indexOf('SUCCESS')>=0||String(v)==='成功')return badge(label,'ok');
+  if(String(v).indexOf('FAIL')>=0||String(v)==='失败')return badge(label,'fail');
+  if(String(v)==='RECEIVED')return badge(label,'pending');
+  return badge(label,'neutral');
+}
+function buildParams(){
+  return buildTaskParams(currentPage, pageSize);
+}
+function buildTaskParams(page, size){
+  var params='?page='+(page||1)+'&size='+(size||pageSize);
+  [['status','filterStatus'],['supplier_type','filterType'],['callback_status','filterCallbackStatus'],['submit_status','filterSubmitStatus'],['query_status','filterQueryStatus'],['keyword','keyword'],['start_date','startDate'],['end_date','endDate']].forEach(function(item){
+    var v=val(item[1]); if(v)params+='&'+item[0]+'='+encodeURIComponent(v);
+  });
+  return params;
+}
+function loadTasks(){
+  api('GET','/internal/register/tasks'+buildParams()).then(function(res){
+    totalCount=res.total||0;
+    taskCache=res.data||[];
+    renderTable();
+    renderPager();
+    loadStats();
+  }).catch(function(e){
+    $('taskList').innerHTML='<tr><td colspan="14">加载失败: '+esc(e.message)+'</td></tr>';
+  });
+}
+function loadStats(){
+  var type=val('filterType');
+  var typeParam=type?'&supplier_type='+encodeURIComponent(type):'';
+  Promise.all([
+    api('GET','/internal/register/tasks?size=1'+typeParam),
+    api('GET','/internal/register/tasks?size=1'+typeParam+'&callback_status=CALLBACK_SUCCESS'),
+    api('GET','/internal/register/tasks?size=1'+typeParam+'&callback_status=CALLBACK_FAIL'),
+    api('GET','/internal/register/tasks?size=1'+typeParam+'&submit_status=SUBMIT_FAIL'),
+    api('GET','/internal/register/tasks?size=1'+typeParam+'&query_status=QUERY_FAIL')
+  ]).then(function(arr){
+    $('statTotal').textContent=arr[0].total||0;
+    $('statPending').textContent=(arr[0].total||0)-((arr[1].total||0)+(arr[2].total||0));
+    $('statCallbackFail').textContent=arr[2].total||0;
+    $('statSubmitFail').textContent=arr[3].total||0;
+    $('statQueryFail').textContent=arr[4].total||0;
+  }).catch(function(){
+    $('statTotal').textContent=totalCount;
+    $('statPending').textContent='-';
+    $('statCallbackFail').textContent='-';
+    $('statSubmitFail').textContent='-';
+    $('statQueryFail').textContent='-';
+  });
+}
+function renderTable(){
+  if(!taskCache.length){$('taskList').innerHTML='<tr><td colspan="14">暂无数据</td></tr>'; return;}
+  $('taskList').innerHTML=taskCache.map(function(t,idx){
+    var code=t.supplierType==='direct'?(t.subSmsPort||'-'):(t.extCode||'-');
+    var querySummary='报备结果：'+displayValue(t.registerStatus)+'；可用性：'+displayValue(t.availableStatus)+'；接入号：'+displayValue(t.accessCode);
+    return '<tr>'
+      +'<td>'+esc(t.flowId)+'</td>'
+      +'<td>'+badge(formatSupplierType(t.supplierType), t.supplierType==='direct'?'neutral':'pending')+'</td>'
+      +'<td>'+esc(t.signature||'-')+'</td>'
+      +'<td>'+esc(t.account||'-')+'</td>'
+      +'<td>'+esc(code)+'</td>'
+      +'<td>'+esc(t.companyName||'-')+'</td>'
+      +'<td>'+esc(formatProduceType(t.produceType)+' / '+formatPriority(t.priority))+'</td>'
+      +'<td>'+stateBadge(t.status)+'</td>'
+      +'<td>'+stateBadge(t.callbackStatus)+'</td>'
+      +'<td>'+stateBadge(t.submitStatus)+'</td>'
+      +'<td>'+stateBadge(t.queryStatus)+'</td>'
+      +'<td>'+esc(querySummary)+'</td>'
+      +'<td>'+esc(t.createdAt||'-')+'</td>'
+      +'<td class="actions">'
+      +'<button class="btn secondary" onclick="showDetail('+idx+')">详情</button>'
+      +'<button class="btn" onclick="openCallback('+idx+')">回传</button>'
+      +(t.supplierType==='third'?'<button class="btn" onclick="openSubmit('+idx+')">修正</button>':'')
+      +(t.supplierType==='third'?'<button class="btn secondary" onclick="openQuery('+idx+')">查询</button>':'')
+      +'</td></tr>';
+  }).join('');
+}
+function renderPager(){
+  var totalPages=Math.max(1,Math.ceil(totalCount/pageSize));
+  $('pageInfo').textContent='共 '+totalCount+' 条';
+  $('pageNum').textContent='第 '+currentPage+' / '+totalPages+' 页';
+  $('prevBtn').disabled=currentPage<=1;
+  $('nextBtn').disabled=currentPage>=totalPages;
+}
+function changePage(offset){currentPage+=offset;loadTasks()}
+function resetFilters(){
+  ['filterType','filterStatus','filterCallbackStatus','filterSubmitStatus','filterQueryStatus','keyword','startDate','endDate'].forEach(function(id){$(id).value=''});
+  currentPage=1; loadTasks();
+}
+function buildVendor(prefix){
+  return [
+    {vendorName:'移动',status:parseInt(val(prefix+'Yd'))},
+    {vendorName:'联通',status:parseInt(val(prefix+'Lt'))},
+    {vendorName:'电信',status:parseInt(val(prefix+'Dx'))}
+  ];
+}
+function findTask(flowId){
+  return taskCache.find(function(item){return item.flowId===flowId});
+}
+function toggleSubPort(prefix){
+  var direct=(prefix==='cb'&&val('cbType')==='direct');
+  $(prefix==='cb'?'cbSubWrap':'subSubWrap').style.display=(direct||val(prefix+'Status')==='2')?'block':'none';
+}
+function showResult(id,data){
+  $(id).style.display='block';
+  $(id).textContent=JSON.stringify(data,null,2);
+}
+function htmlCell(v){
+  return String(v==null||v===''?'-':v)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+function exportDetail(){
+  if(!currentDetailData||!currentDetailData.task){
+    alert('请先打开详情页');
+    return;
+  }
+  var task=currentDetailData.task;
+  var baseRows=[
+    ['字段','值'],
+    ['FlowId',task.flowId],['类型',formatSupplierType(task.supplierType)],['签名',task.signature],['账号',task.account],['扩展码',task.extCode],['子端口',task.subSmsPort],
+    ['企业名称',task.companyName],['统一社会信用代码',task.organizationCode],['签名来源',formatSignSource(task.signSource)],['应用场景',task.applySceneContent],
+    ['责任人',task.registName],['责任人证件',formatCertInfo(task.registCertType,task.registCertId)],['法人',task.legalName],['法人证件',formatCertInfo(task.legalCertType,task.legalCertId)],
+    ['经办人',task.agencyName],['经办人证件',formatCertInfo(task.agencyCertType,task.agencyCertId)],['产品类型',formatProduceType(task.produceType)],['行业类型',formatIndustryType(task.industryType)],
+    ['报备类型',formatRegisterType(task.registerType)],['优先级',formatPriority(task.priority)],['当前状态',formatMainStatus(task.status)],['回传状态',formatMainStatus(task.callbackStatus)],['修正状态',formatMainStatus(task.submitStatus)],
+    ['查询状态',formatMainStatus(task.queryStatus)],['签名证明',task.signCertificatePic],['营业执照',task.businessLicensePic],['错误码',task.errorCode],['错误信息',task.errorMsg]
+  ];
+  var snapshotRows=[['来源','报备结果','可用性','接入号','子端口','说明','更新时间']].concat((currentDetailData.snapshots||[]).map(function(item){
+    return [formatSourceType(item.sourceType),displayValue(item.registerStatus),displayValue(item.availableStatus),displayValue(item.accessCode),displayValue(item.subSmsPort),displayValue(item.desc),displayValue(item.updatedAt)];
+  }));
+  var vendorRows=[['来源','运营商','状态','错误码','错误说明','更新时间']].concat((currentDetailData.vendorStatuses||[]).map(function(item){
+    return [formatSourceType(item.sourceType),displayValue(item.vendorName),formatVendorStatus(item.vendorStatus),displayValue(item.errorCode),displayValue(item.errorDesc),displayValue(item.updatedAt)];
+  }));
+  var eventRows=[['方向','事件','请求ID','事件键','HTTP状态','结果','错误信息','时间']].concat((currentDetailData.events||[]).map(function(item){
+    return [formatDirection(item.direction),displayValue(item.eventType),displayValue(item.requestId),displayValue(item.eventKey),displayValue(item.httpStatus),item.success?'成功':'失败',displayValue(item.errorMessage),displayValue(item.createdAt)];
+  }));
+  function tableHtml(title, rows){
+    return '<table border="1" cellspacing="0" cellpadding="4"><tr><th colspan="'+rows[0].length+'" style="background:#eef3f8">'+htmlCell(title)+'</th></tr>'
+      +rows.map(function(row){
+        return '<tr>'+row.map(function(col, idx){return (title==='基础信息'&&rows.indexOf(row)>0&&idx===0?'<td><b>'+htmlCell(col)+'</b></td>':'<td>'+htmlCell(col)+'</td>');}).join('')+'</tr>';
+      }).join('')+'</table><br/>';
+  }
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>'
+    +tableHtml('基础信息', baseRows)
+    +tableHtml('结果快照', snapshotRows)
+    +tableHtml('运营商结果', vendorRows)
+    +tableHtml('事件日志', eventRows)
+    +'</body></html>';
+  var blob=new Blob(['\ufeff', html], {type:'application/vnd.ms-excel'});
+  var link=document.createElement('a');
+  link.href=URL.createObjectURL(blob);
+  link.download=(task.flowId||'detail')+'_详情导出.xls';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+}
+function summarizeSnapshots(snapshots){
+  if(!snapshots||!snapshots.length)return '-';
+  return snapshots.map(function(item){
+    return formatSourceType(item.sourceType)+'：报备结果='+displayValue(item.registerStatus)+'，可用性='+displayValue(item.availableStatus)+'，接入号='+displayValue(item.accessCode)+'，子端口='+displayValue(item.subSmsPort)+'，说明='+displayValue(item.desc);
+  }).join('；');
+}
+function summarizeVendorStatuses(vendors){
+  if(!vendors||!vendors.length)return '-';
+  return vendors.map(function(item){
+    var msg=formatSourceType(item.sourceType)+' / '+displayValue(item.vendorName)+' / '+formatVendorStatus(item.vendorStatus);
+    if(displayValue(item.errorCode)!=='-')msg+=' / 错误码='+displayValue(item.errorCode);
+    if(displayValue(item.errorDesc)!=='-')msg+=' / 错误说明='+displayValue(item.errorDesc);
+    return msg;
+  }).join('；');
+}
+function summarizeEvents(events){
+  if(!events||!events.length)return '-';
+  return events.map(function(item){
+    return formatDirection(item.direction)+' / '+displayValue(item.eventType)+' / '+(item.success?'成功':'失败')+' / '+displayValue(item.createdAt);
+  }).join('；');
+}
+function buildAllDetailRows(detail){
+  var task=detail.task||{};
+  return [
+    task.flowId,
+    formatSupplierType(task.supplierType),
+    displayValue(task.signature),
+    displayValue(task.account),
+    displayValue(task.extCode),
+    displayValue(task.subSmsPort),
+    displayValue(task.companyName),
+    displayValue(task.organizationCode),
+    formatSignSource(task.signSource),
+    displayValue(task.applySceneContent),
+    displayValue(task.registName),
+    formatCertInfo(task.registCertType,task.registCertId),
+    displayValue(task.legalName),
+    formatCertInfo(task.legalCertType,task.legalCertId),
+    displayValue(task.agencyName),
+    formatCertInfo(task.agencyCertType,task.agencyCertId),
+    formatProduceType(task.produceType),
+    formatIndustryType(task.industryType),
+    formatRegisterType(task.registerType),
+    formatPriority(task.priority),
+    formatMainStatus(task.status),
+    formatMainStatus(task.callbackStatus),
+    formatMainStatus(task.submitStatus),
+    formatMainStatus(task.queryStatus),
+    displayValue(task.registerStatus),
+    displayValue(task.availableStatus),
+    displayValue(task.accessCode),
+    displayValue(task.queryDesc),
+    displayValue(task.signCertificatePic),
+    displayValue(task.businessLicensePic),
+    summarizeSnapshots(detail.snapshots),
+    summarizeVendorStatuses(detail.vendorStatuses),
+    summarizeEvents(detail.events),
+    displayValue(task.errorCode),
+    displayValue(task.errorMsg),
+    displayValue(task.createdAt),
+    displayValue(task.updatedAt)
+  ];
+}
+function downloadExcelTable(title, headers, rows, filename){
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>';
+  html+='<table border="1" cellspacing="0" cellpadding="4"><tr><th colspan="'+headers.length+'" style="background:#eef3f8">'+htmlCell(title)+'</th></tr>';
+  html+='<tr>'+headers.map(function(h){return '<th>'+htmlCell(h)+'</th>'}).join('')+'</tr>';
+  html+=rows.map(function(row){
+    return '<tr>'+row.map(function(col){return '<td>'+htmlCell(displayValue(col))+'</td>'}).join('')+'</tr>';
+  }).join('');
+  html+='</table></body></html>';
+  var blob=new Blob(['\ufeff', html], {type:'application/vnd.ms-excel'});
+  var link=document.createElement('a');
+  link.href=URL.createObjectURL(blob);
+  link.download=filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+}
+async function legacyExportAllDetails(){
+  var btn=$('exportAllBtn');
+  var oldText=btn.textContent;
+  btn.disabled=true;
+  btn.textContent='导出中...';
+  try{
+    var page=1, size=200, allTasks=[], total=0;
+    do{
+      var res=await api('GET','/internal/register/tasks'+buildTaskParams(page,size));
+      total=res.total||0;
+      allTasks=allTasks.concat(res.data||[]);
+      page+=1;
+    }while(allTasks.length<total);
+    if(!allTasks.length){
+      alert('当前筛选没有可导出的数据');
+      return;
+    }
+    var details=await Promise.all(allTasks.map(function(task){
+      return api('GET','/internal/register/'+encodeURIComponent(task.flowId));
+    }));
+    var headers=['FlowId','类型','签名','账号','扩展码','子端口','企业名称','统一社会信用代码','签名来源','应用场景','责任人','责任人证件','法人','法人证件','经办人','经办人证件','产品类型','行业类型','报备类型','优先级','当前状态','回传状态','修正状态','查询状态','报备结果','可用性','接入号','查询说明','签名证明','营业执照','结果快照汇总','运营商结果汇总','事件日志汇总','错误码','错误信息','接收时间','更新时间'];
+    var rows=details.map(buildAllDetailRows);
+    downloadExcelTable('当前筛选全部详情导出', headers, rows, '当前筛选全部详情导出.xls');
+  }catch(e){
+    alert('导出失败：'+(e&&e.message?e.message:e));
+  }finally{
+    btn.disabled=false;
+    btn.textContent=oldText;
+  }
+}
+function renderExportFieldOptions(){
+  $('exportFieldList').innerHTML=exportFieldDefs.map(function(field){
+    return '<label class="export-field-item"><input type="checkbox" class="export-field-checkbox" value="'+field.key+'"> <span>'+esc(field.label)+'</span></label>';
+  }).join('');
+}
+function resetExportFieldSelection(){
+  if(!$('exportFieldList').innerHTML){
+    renderExportFieldOptions();
+  }
+  exportFieldDefs.forEach(function(field){
+    var input=document.querySelector('.export-field-checkbox[value="'+field.key+'"]');
+    if(input)input.checked=exportFieldDefaults.indexOf(field.key)>=0;
+  });
+}
+function setAllExportFields(checked){
+  if(!$('exportFieldList').innerHTML){
+    renderExportFieldOptions();
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.export-field-checkbox'), function(input){
+    input.checked=checked;
+  });
+}
+function getSelectedExportFields(){
+  var selectedKeys=[];
+  Array.prototype.forEach.call(document.querySelectorAll('.export-field-checkbox:checked'), function(input){
+    selectedKeys.push(input.value);
+  });
+  return exportFieldDefs.filter(function(field){
+    return selectedKeys.indexOf(field.key)>=0;
+  });
+}
+function exportAllDetails(){
+  resetExportFieldSelection();
+  openModal('exportFieldsModal');
+}
+function csvCell(value){
+  var text=value==null?'':String(value);
+  if(/[",\r\n]/.test(text)){
+    return '"'+text.replace(/"/g,'""')+'"';
+  }
+  return text;
+}
+function downloadCsv(lines, filename){
+  var blob=new Blob(['\ufeff', lines.join('\r\n')], {type:'text/csv;charset=utf-8;'});
+  var link=document.createElement('a');
+  link.href=URL.createObjectURL(blob);
+  link.download=filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+}
+function buildCsvRow(task, fields){
+  return fields.map(function(field){
+    return csvCell(field.getter(task));
+  }).join(',');
+}
+function timestampText(value){
+  return String(value).padStart(2,'0');
+}
+function legacyBuildExportFilename(){
+  var now=new Date();
+  return '当前筛选导出_'
+    +now.getFullYear()
+    +'-'+timestampText(now.getMonth()+1)
+    +'-'+timestampText(now.getDate())
+    +'_'+timestampText(now.getHours())
+    +'-'+timestampText(now.getMinutes())
+    +'-'+timestampText(now.getSeconds())
+    +'.csv';
+}
+function legacyUpdateExportProgress(btn, exportedCount, total){
+  btn.textContent='导出中 '+exportedCount+'/'+total+'...';
+}
+async function legacyConfirmExportAllDetails(){
+  var fields=getSelectedExportFields();
+  var btn=$('exportAllBtn');
+  var confirmBtn=$('exportConfirmBtn');
+  var oldText=btn.textContent;
+  if(!fields.length){
+    alert('请至少选择一个字段');
+    return;
+  }
+  closeModal('exportFieldsModal');
+  btn.disabled=true;
+  confirmBtn.disabled=true;
+  btn.textContent='导出中 0/...';
+  try{
+    var page=1, size=200, total=0, exportedCount=0;
+    var lines=[fields.map(function(field){return csvCell(field.label)}).join(',')];
+    while(true){
+      var res=await api('GET','/internal/register/tasks'+buildTaskParams(page,size));
+      if(!res||!Array.isArray(res.data)){
+        throw new Error('第 '+page+' 页加载失败');
+      }
+      if(page===1){
+        total=res.total||0;
+        if(!total){
+          alert('当前筛选没有可导出的数据');
+          return;
+        }
+      }
+      if(!res.data.length){
+        break;
+      }
+      res.data.forEach(function(task){
+        lines.push(buildCsvRow(task, fields));
+      });
+      exportedCount+=res.data.length;
+      updateExportProgress(btn, Math.min(exportedCount,total), total);
+      if(exportedCount>=total){
+        break;
+      }
+      page+=1;
+    }
+    if(lines.length===1){
+      alert('当前筛选没有可导出的数据');
+      return;
+    }
+    var blob=new Blob(['\ufeff', lines.join('\r\n')], {type:'text/csv;charset=utf-8;'});
+    var link=document.createElement('a');
+    link.href=URL.createObjectURL(blob);
+    link.download=buildExportFilename();
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+  }catch(e){
+    alert('导出失败：'+(e&&e.message?e.message:e));
+  }finally{
+    btn.disabled=false;
+    btn.textContent=oldText;
+    confirmBtn.disabled=false;
+  }
+}
+function buildExportFilename(){
+  var now=new Date();
+  return '\u5f53\u524d\u7b5b\u9009\u5bfc\u51fa_'
+    +now.getFullYear()
+    +'-'+timestampText(now.getMonth()+1)
+    +'-'+timestampText(now.getDate())
+    +'_'+timestampText(now.getHours())
+    +'-'+timestampText(now.getMinutes())
+    +'-'+timestampText(now.getSeconds())
+    +'.csv';
+}
+function updateExportProgress(btn, exportedCount, total){
+  btn.textContent='\u5bfc\u51fa\u4e2d '+exportedCount+'/'+total+'...';
+}
+async function confirmExportAllDetails(){
+  var fields=getSelectedExportFields();
+  var btn=$('exportAllBtn');
+  var confirmBtn=$('exportConfirmBtn');
+  var oldText=btn.textContent;
+  if(!fields.length){
+    alert('\u8bf7\u81f3\u5c11\u9009\u62e9\u4e00\u4e2a\u5b57\u6bb5');
+    return;
+  }
+  closeModal('exportFieldsModal');
+  btn.disabled=true;
+  confirmBtn.disabled=true;
+  btn.textContent='\u5bfc\u51fa\u4e2d 0/...';
+  try{
+    var page=1, size=200, total=0, exportedCount=0;
+    var lines=[fields.map(function(field){return csvCell(field.label)}).join(',')];
+    while(true){
+      var res=await api('GET','/internal/register/tasks'+buildTaskParams(page,size));
+      if(!res||!Array.isArray(res.data)){
+        throw new Error('\u7b2c '+page+' \u9875\u52a0\u8f7d\u5931\u8d25');
+      }
+      if(page===1){
+        total=res.total||0;
+        if(!total){
+          alert('\u5f53\u524d\u7b5b\u9009\u6ca1\u6709\u53ef\u5bfc\u51fa\u7684\u6570\u636e');
+          return;
+        }
+      }
+      if(!res.data.length){
+        break;
+      }
+      res.data.forEach(function(task){
+        lines.push(buildCsvRow(task, fields));
+      });
+      exportedCount+=res.data.length;
+      updateExportProgress(btn, Math.min(exportedCount,total), total);
+      if(exportedCount>=total){
+        break;
+      }
+      page+=1;
+    }
+    if(lines.length===1){
+      alert('\u5f53\u524d\u7b5b\u9009\u6ca1\u6709\u53ef\u5bfc\u51fa\u7684\u6570\u636e');
+      return;
+    }
+    var blob=new Blob(['\ufeff', lines.join('\r\n')], {type:'text/csv;charset=utf-8;'});
+    var link=document.createElement('a');
+    link.href=URL.createObjectURL(blob);
+    link.download=buildExportFilename();
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+  }catch(e){
+    alert('\u5bfc\u51fa\u5931\u8d25\uff1a'+(e&&e.message?e.message:e));
+  }finally{
+    btn.disabled=false;
+    btn.textContent=oldText;
+    confirmBtn.disabled=false;
+  }
+}
+var callbackTemplateHeaders=['FlowId','类型','签名','账号','企业','扩展码/子端口','当前回传状态','报备结果','实际子端口','失败说明','移动状态','移动错误码','移动错误说明','联通状态','联通错误码','联通错误说明','电信状态','电信错误码','电信错误说明'];
+var callbackFillHeaders=['报备结果','实际子端口','失败说明','移动状态','移动错误码','移动错误说明','联通状态','联通错误码','联通错误说明','电信状态','电信错误码','电信错误说明'];
+function buildCallbackTemplateFilename(){
+  var now=new Date();
+  return '回传模板_'
+    +now.getFullYear()
+    +'-'+timestampText(now.getMonth()+1)
+    +'-'+timestampText(now.getDate())
+    +'_'+timestampText(now.getHours())
+    +'-'+timestampText(now.getMinutes())
+    +'-'+timestampText(now.getSeconds())
+    +'.csv';
+}
+async function fetchCurrentFilteredTasks(progressBtn, prefixText){
+  var page=1, size=200, total=0, items=[];
+  while(true){
+    var res=await api('GET','/internal/register/tasks'+buildTaskParams(page,size));
+    if(!res||!Array.isArray(res.data)){
+      throw new Error('第 '+page+' 页加载失败');
+    }
+    if(page===1)total=res.total||0;
+    items=items.concat(res.data||[]);
+    if(progressBtn)progressBtn.textContent=prefixText+' '+Math.min(items.length,total)+'/'+total+'...';
+    if(items.length>=total||!res.data.length)break;
+    page+=1;
+  }
+  return items;
+}
+async function exportCallbackTemplate(){
+  var btn=$('callbackTemplateBtn');
+  var oldText=btn.textContent;
+  btn.disabled=true;
+  btn.textContent='导出中 0/...';
+  try{
+    var tasks=await fetchCurrentFilteredTasks(btn,'导出中');
+    var rows=tasks.filter(function(task){return task.callbackStatus!=='CALLBACK_SUCCESS';});
+    if(!rows.length){
+      alert('当前筛选没有待回传或回传失败的记录');
+      return;
+    }
+    var lines=[callbackTemplateHeaders.map(csvCell).join(',')];
+    rows.forEach(function(task){
+      var code=task.supplierType==='direct'?(task.subSmsPort||''):(task.extCode||'');
+      lines.push([
+        task.flowId,
+        formatSupplierType(task.supplierType),
+        task.signature||'',
+        task.account||'',
+        task.companyName||'',
+        code,
+        formatMainStatus(task.callbackStatus),
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        ''
+      ].map(csvCell).join(','));
+    });
+    downloadCsv(lines, buildCallbackTemplateFilename());
+  }catch(e){
+    alert('导出回传模板失败：'+(e&&e.message?e.message:e));
+  }finally{
+    btn.disabled=false;
+    btn.textContent=oldText;
+  }
+}
+function parseCsv(text){
+  if(text&&text.charCodeAt(0)===0xfeff)text=text.slice(1);
+  var rows=[], row=[], cell='', inQuotes=false;
+  for(var i=0;i<text.length;i+=1){
+    var ch=text.charAt(i);
+    if(inQuotes){
+      if(ch==='"'){
+        if(text.charAt(i+1)==='"'){
+          cell+='"';
+          i+=1;
+        }else{
+          inQuotes=false;
+        }
+      }else{
+        cell+=ch;
+      }
+    }else if(ch==='"'){
+      inQuotes=true;
+    }else if(ch===','){
+      row.push(cell);
+      cell='';
+    }else if(ch==='\n'){
+      row.push(cell);
+      rows.push(row);
+      row=[];
+      cell='';
+    }else if(ch==='\r'){
+      if(text.charAt(i+1)==='\n')i+=1;
+      row.push(cell);
+      rows.push(row);
+      row=[];
+      cell='';
+    }else{
+      cell+=ch;
+    }
+  }
+  if(cell!==''||row.length){
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows.filter(function(r){
+    return r.some(function(c){return String(c||'').trim()!=='';});
+  });
+}
+async function readCsvText(file){
+  if(window.TextDecoder&&file.arrayBuffer){
+    var buffer=await file.arrayBuffer();
+    try{
+      return new TextDecoder('utf-8',{fatal:true}).decode(buffer);
+    }catch(e){
+      try{
+        return new TextDecoder('gb18030').decode(buffer);
+      }catch(e2){
+        return new TextDecoder('gbk').decode(buffer);
+      }
+    }
+  }
+  return file.text();
+}
+function hasCallbackFillValue(obj){
+  return callbackFillHeaders.some(function(header){
+    return String(obj[header]||'').trim()!=='';
+  });
+}
+function rowsToObjects(rows){
+  var headers=rows[0].map(function(item){return String(item||'').trim();});
+  return rows.slice(1).map(function(row, idx){
+    var obj={_lineNumber:idx+2};
+    headers.forEach(function(header, colIdx){
+      if(header)obj[header]=row[colIdx]==null?'':String(row[colIdx]).trim();
+    });
+    return obj;
+  });
+}
+function csvValue(row, header){
+  return String(row.raw[header]||'').trim();
+}
+function parseReportStatus(value){
+  var text=String(value||'').trim();
+  if(!text)return {error:'报备结果必填'};
+  var first=text.match(/^([123])($|\s|[^\d])/);
+  if(first)return {value:parseInt(first[1])};
+  if(text.indexOf('不能发')>=0)return {value:3};
+  if(text.indexOf('不保证透传')>=0)return {value:2};
+  if(text.indexOf('透传')>=0)return {value:1};
+  return {error:'报备结果必须为 1/2/3'};
+}
+function parseCarrierStatus(value, label){
+  var text=String(value||'').trim();
+  if(!text)return {error:label+'状态必填'};
+  if(text==='1'||text==='成功')return {value:1};
+  if(text==='2'||text==='失败')return {value:2};
+  if(/^1(\s|[^\d])/.test(text))return {value:1};
+  if(/^2(\s|[^\d])/.test(text))return {value:2};
+  return {error:label+'状态必须为 1/2 或 成功/失败'};
+}
+function buildCarrierPayload(row, label){
+  var parsed=parseCarrierStatus(csvValue(row,label+'状态'), label);
+  if(parsed.error)return {error:parsed.error};
+  var item={vendorName:label,status:parsed.value};
+  var errorCode=csvValue(row,label+'错误码');
+  var errorDesc=csvValue(row,label+'错误说明');
+  if(errorCode)item.errorCode=errorCode;
+  if(errorDesc)item.errorDesc=errorDesc;
+  return {value:item};
+}
+function setBatchRowError(row, message){
+  row.state='error';
+  row.message=message;
+  row.payload=null;
+}
+function validateBatchCallbackRow(row){
+  var task=row.task;
+  if(!task){
+    setBatchRowError(row,'未找到系统记录');
+    return;
+  }
+  row.signature=task.signature||'';
+  row.account=task.account||'';
+  row.supplierType=task.supplierType||'';
+  if(task.callbackStatus==='CALLBACK_SUCCESS'){
+    row.state='skip';
+    row.message='已回传成功，自动跳过';
+    return;
+  }
+  var reportStatus=parseReportStatus(csvValue(row,'报备结果'));
+  if(reportStatus.error){
+    setBatchRowError(row,reportStatus.error);
+    return;
+  }
+  var vendors=[];
+  for(var i=0;i<['移动','联通','电信'].length;i+=1){
+    var vendor=buildCarrierPayload(row, ['移动','联通','电信'][i]);
+    if(vendor.error){
+      setBatchRowError(row,vendor.error);
+      return;
+    }
+    vendors.push(vendor.value);
+  }
+  if(!task.signature){
+    setBatchRowError(row,'系统记录缺少签名');
+    return;
+  }
+  var direct=task.supplierType==='direct';
+  var subSmsPort=csvValue(row,'实际子端口') || task.subSmsPort || '';
+  if((direct||reportStatus.value===2)&&!subSmsPort){
+    setBatchRowError(row,'直连供应商或报备结果=2时实际子端口必填');
+    return;
+  }
+  if(!direct&&!task.extCode){
+    setBatchRowError(row,'三方资源缺少系统扩展码');
+    return;
+  }
+  var data={id:row.flowId,action:'report',status:reportStatus.value,signature:task.signature,vendorStatus:vendors};
+  if(!direct)data.extCode=task.extCode||'';
+  if(direct||reportStatus.value===2)data.subSmsPort=subSmsPort;
+  if(csvValue(row,'失败说明'))data.desc=csvValue(row,'失败说明');
+  row.reportStatus=reportStatus.value;
+  row.vendorSummary=vendors.map(function(item){return item.vendorName+formatVendorStatus(item.status)}).join(' / ');
+  row.payload={data:data};
+  row.state='ready';
+  row.message='待回传';
+}
+function renderBatchCallbackPreview(){
+  var ready=batchCallbackRows.filter(function(row){return row.state==='ready';}).length;
+  var skipped=batchCallbackRows.filter(function(row){return row.state==='skip';}).length;
+  var errors=batchCallbackRows.filter(function(row){return row.state==='error'||row.state==='fail';}).length;
+  $('batchTotal').textContent=batchCallbackRows.length;
+  $('batchReady').textContent=ready;
+  $('batchSkipped').textContent=skipped;
+  $('batchErrors').textContent=errors;
+  $('batchCallbackConfirmBtn').disabled=batchCallbackRunning||ready===0;
+  $('batchCallbackList').innerHTML=batchCallbackRows.map(function(row){
+    var cls=row.state==='ready'?'batch-row-ready':(row.state==='skip'?'batch-row-skip':(row.state==='done'||row.state==='running'?'batch-row-done':'batch-row-error'));
+    var stateMap={ready:'可回传',skip:'跳过',error:'错误',running:'回传中',done:'已回传',fail:'回传失败'};
+    return '<tr>'
+      +'<td>'+esc(row.lineNumber)+'</td>'
+      +'<td>'+esc(row.flowId||'-')+'</td>'
+      +'<td>'+esc(row.signature||'-')+'</td>'
+      +'<td>'+esc(row.account||'-')+'</td>'
+      +'<td>'+esc(formatSupplierType(row.supplierType)||'-')+'</td>'
+      +'<td>'+esc(row.reportStatus||csvValue(row,'报备结果')||'-')+'</td>'
+      +'<td>'+esc(row.vendorSummary||'-')+'</td>'
+      +'<td class="'+cls+'">'+esc(stateMap[row.state]||row.state||'-')+'</td>'
+      +'<td>'+esc(row.message||'-')+'</td>'
+      +'</tr>';
+  }).join('')||'<tr><td colspan="9">暂无数据</td></tr>';
+}
+async function validateImportedCallbackRows(objects){
+  var seen={};
+  batchCallbackRows=objects.map(function(obj){
+    var flowId=String(obj.FlowId||'').trim();
+    var row={lineNumber:obj._lineNumber,raw:obj,flowId:flowId,state:'ready',message:'待校验'};
+    if(!flowId){
+      setBatchRowError(row,'FlowId必填');
+    }else if(seen[flowId]){
+      setBatchRowError(row,'FlowId重复，首次出现在第 '+seen[flowId]+' 行');
+    }else{
+      seen[flowId]=obj._lineNumber;
+    }
+    return row;
+  });
+  renderBatchCallbackPreview();
+  var rowsToFetch=batchCallbackRows.filter(function(row){return row.state!=='error';});
+  for(var i=0;i<rowsToFetch.length;i+=1){
+    var row=rowsToFetch[i];
+    $('batchCallbackHint').textContent='正在校验 '+(i+1)+'/'+rowsToFetch.length+'：'+row.flowId;
+    try{
+      var res=await api('GET','/internal/register/'+encodeURIComponent(row.flowId));
+      if(res&&res.task){
+        row.task=res.task;
+        validateBatchCallbackRow(row);
+      }else{
+        setBatchRowError(row,(res&&res.message)||'未找到系统记录');
+      }
+    }catch(e){
+      setBatchRowError(row,e&&e.message?e.message:e);
+    }
+    renderBatchCallbackPreview();
+  }
+  $('batchCallbackHint').textContent='校验完成，请确认可回传行数后执行。';
+}
+async function handleCallbackCsvFile(event){
+  var input=event.target;
+  var file=input.files&&input.files[0];
+  input.value='';
+  if(!file)return;
+  batchCallbackRunning=false;
+  batchCallbackRows=[];
+  $('batchCallbackHint').textContent='正在读取 CSV...';
+  $('batchCallbackResult').style.display='none';
+  renderBatchCallbackPreview();
+  openModal('batchCallbackModal');
+  try{
+    var text=await readCsvText(file);
+    var rows=parseCsv(text);
+    if(rows.length<2){
+      throw new Error('CSV至少需要表头和一行数据');
+    }
+    var headers=rows[0].map(function(item){return String(item||'').trim();});
+    var required=['FlowId','报备结果','移动状态','联通状态','电信状态'];
+    var missing=required.filter(function(header){return headers.indexOf(header)<0;});
+    if(missing.length){
+      throw new Error('CSV缺少必要列：'+missing.join('、'));
+    }
+    var objects=rowsToObjects(rows).filter(hasCallbackFillValue);
+    if(!objects.length){
+      throw new Error('没有检测到已填写的回传内容，请至少填写报备结果、移动状态、联通状态、电信状态');
+    }
+    await validateImportedCallbackRows(objects);
+  }catch(e){
+    $('batchCallbackHint').textContent='导入失败：'+(e&&e.message?e.message:e);
+    $('batchCallbackConfirmBtn').disabled=true;
+  }
+}
+function callbackResponseMessage(res){
+  if(!res)return '无响应';
+  if(res.message)return res.message;
+  if(res.error)return res.error;
+  if(res.response){
+    return res.response.message||JSON.stringify(res.response);
+  }
+  return JSON.stringify(res);
+}
+function isCallbackSuccess(res){
+  return !!(res&&res.error==null&&res.response&&res.response.code===0);
+}
+async function runBatchCallback(){
+  var readyRows=batchCallbackRows.filter(function(row){return row.state==='ready';});
+  if(!readyRows.length){
+    alert('没有可回传的记录');
+    return;
+  }
+  if(!confirm('确认批量回传 '+readyRows.length+' 条记录？'))return;
+  var btn=$('batchCallbackConfirmBtn');
+  batchCallbackRunning=true;
+  btn.disabled=true;
+  $('batchCallbackResult').style.display='none';
+  var success=0, fail=0;
+  for(var i=0;i<readyRows.length;i+=1){
+    var row=readyRows[i];
+    row.state='running';
+    row.message='回传中 '+(i+1)+'/'+readyRows.length;
+    $('batchCallbackHint').textContent='正在回传 '+(i+1)+'/'+readyRows.length+'：'+row.flowId;
+    renderBatchCallbackPreview();
+    try{
+      var res=await api('POST','/internal/register/'+encodeURIComponent(row.flowId)+'/callback',row.payload);
+      row.response=res;
+      if(isCallbackSuccess(res)){
+        row.state='done';
+        row.message='回传成功';
+        success+=1;
+      }else{
+        row.state='fail';
+        row.message=callbackResponseMessage(res);
+        fail+=1;
+      }
+    }catch(e){
+      row.state='fail';
+      row.message=e&&e.message?e.message:e;
+      fail+=1;
+    }
+    renderBatchCallbackPreview();
+  }
+  $('batchCallbackHint').textContent='批量回传完成：成功 '+success+' 条，失败 '+fail+' 条。';
+  $('batchCallbackResult').style.display='block';
+  $('batchCallbackResult').textContent=JSON.stringify({success:success,fail:fail,skipped:batchCallbackRows.filter(function(row){return row.state==='skip';}).length},null,2);
+  batchCallbackRunning=false;
+  renderBatchCallbackPreview();
+  loadTasks();
+}
+function showDetail(idx){
+  var task=taskCache[idx];
+  api('GET','/internal/register/'+encodeURIComponent(task.flowId)).then(function(res){
+    currentDetailData=res;
+    var t=res.task||task;
+    var rows=[
+      ['FlowId',t.flowId],['类型',formatSupplierType(t.supplierType)],['签名',t.signature],['账号',t.account],['扩展码',t.extCode],['子端口',t.subSmsPort],
+      ['企业名称',t.companyName],['统一社会信用代码',t.organizationCode],['签名来源',formatSignSource(t.signSource)],['应用场景',t.applySceneContent],
+      ['责任人',t.registName],['责任人证件',formatCertInfo(t.registCertType,t.registCertId)],['法人',t.legalName],['法人证件',formatCertInfo(t.legalCertType,t.legalCertId)],
+      ['经办人',t.agencyName],['经办人证件',formatCertInfo(t.agencyCertType,t.agencyCertId)],['产品类型',formatProduceType(t.produceType)],['行业类型',formatIndustryType(t.industryType)],['报备类型',formatRegisterType(t.registerType)],
+      ['优先级',formatPriority(t.priority)],['当前状态',formatMainStatus(t.status)],['回传状态',formatMainStatus(t.callbackStatus)],['修正状态',formatMainStatus(t.submitStatus)],['查询状态',formatMainStatus(t.queryStatus)],
+      ['签名证明',t.signCertificatePic],['营业执照',t.businessLicensePic],['错误码',t.errorCode],['错误信息',t.errorMsg]
+    ];
+    $('detailTask').innerHTML=rows.map(function(r){
+      var v=displayValue(r[1]);
+      if(String(v).indexOf('http')===0){v='<a class="link" target="_blank" href="'+esc(v)+'">'+esc(v)+'</a>'} else {v=esc(v)}
+      return '<div class="k">'+r[0]+'</div><div>'+v+'</div>';
+    }).join('');
+    $('detailSnapshots').innerHTML=(res.snapshots||[]).map(function(item){
+      return '<div class="k">'+esc(formatSourceType(item.sourceType))+'</div><div>'+esc('报备结果：'+displayValue(item.registerStatus)+'；可用性：'+displayValue(item.availableStatus)+'；接入号：'+displayValue(item.accessCode)+'；子端口：'+displayValue(item.subSmsPort)+'；说明：'+displayValue(item.desc))+'</div>';
+    }).join('')||'<div class="k">暂无</div><div>-</div>';
+    $('detailVendor').innerHTML=(res.vendorStatuses||[]).map(function(item){
+      return '<tr><td>'+esc(formatSourceType(item.sourceType))+'</td><td>'+esc(displayValue(item.vendorName))+'</td><td>'+esc(formatVendorStatus(item.vendorStatus))+'</td><td>'+esc(displayValue(item.errorCode))+'</td><td>'+esc(displayValue(item.errorDesc))+'</td></tr>';
+    }).join('')||'<tr><td colspan="4">暂无</td></tr>';
+    $('detailEvents').innerHTML=(res.events||[]).map(function(item){
+      return '<tr><td>'+esc(formatDirection(item.direction))+' / '+esc(displayValue(item.eventType))+'</td><td>'+esc(displayValue(item.requestId))+'</td><td>'+esc(item.success?'成功':'失败')+'</td><td>'+esc(displayValue(item.createdAt))+'</td></tr>';
+    }).join('')||'<tr><td colspan="4">暂无</td></tr>';
+    openModal('detailModal');
+  });
+}
+function openCallback(idx){
+  var t=taskCache[idx];
+  $('cbFlowId').value=t.flowId; $('cbType').value=t.supplierType; $('cbStatus').value='1'; $('cbSubSmsPort').value=t.subSmsPort||''; $('cbDesc').value='';
+  ['cbYd','cbLt','cbDx'].forEach(function(id){$(id).value='1'});
+  toggleSubPort('cb');
+  $('cbResult').style.display='none';
+  openModal('callbackModal');
+}
+function doCallback(){
+  var flowId=val('cbFlowId'), task=findTask(flowId), direct=val('cbType')==='direct', status=parseInt(val('cbStatus'));
+  var data={id:flowId,action:'report',status:status,signature:task.signature,vendorStatus:buildVendor('cb')};
+  if(!direct)data.extCode=task.extCode||'';
+  if(direct||status===2)data.subSmsPort=val('cbSubSmsPort');
+  if(val('cbDesc'))data.desc=val('cbDesc');
+  api('POST','/internal/register/'+encodeURIComponent(flowId)+'/callback',{data:data}).then(function(res){showResult('cbResult',res);loadTasks()}).catch(function(e){showResult('cbResult',{error:e.message})});
+}
+function openSubmit(idx){
+  var t=taskCache[idx];
+  $('subFlowId').value=t.flowId; $('subStatus').value='1'; $('subSubSmsPort').value=''; $('subDesc').value='';
+  ['subYd','subLt','subDx'].forEach(function(id){$(id).value='1'});
+  toggleSubPort('sub'); $('subResult').style.display='none'; openModal('submitModal');
+}
+function doSubmit(){
+  var flowId=val('subFlowId'), task=findTask(flowId), status=parseInt(val('subStatus'));
+  var data={action:'report',status:status,signature:task.signature,account:task.account,vendorStatus:buildVendor('sub'),extCode:task.extCode||''};
+  if(status===2)data.subSmsPort=val('subSubSmsPort');
+  if(val('subDesc'))data.desc=val('subDesc');
+  api('POST','/internal/register/'+encodeURIComponent(flowId)+'/submit',{data:data}).then(function(res){showResult('subResult',res);loadTasks()}).catch(function(e){showResult('subResult',{error:e.message})});
+}
+function openQuery(idx){
+  var t=taskCache[idx];
+  $('queryFlowId').value=t.flowId; $('queryAccount').value=t.account||''; $('querySignature').value=t.signature||''; $('queryPriority').value=t.priority||''; $('queryRegisterType').value=t.registerType==null?'':String(t.registerType);
+  $('queryResult').style.display='none'; openModal('queryModal');
+}
+function doQuery(){
+  var body={flowId:val('queryFlowId'),data:{account:val('queryAccount'),signature:val('querySignature'),priority:val('queryPriority'),registerType:val('queryRegisterType')?parseInt(val('queryRegisterType')):undefined,pageIndex:1,pageSize:1}};
+  api('POST','/internal/register/query',body).then(function(res){showResult('queryResult',res);loadTasks()}).catch(function(e){showResult('queryResult',{error:e.message})});
+}
+loadTasks();
+</script>
+</body>
+</html>

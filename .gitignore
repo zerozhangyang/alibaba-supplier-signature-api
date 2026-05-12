@@ -1,0 +1,8 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.log
+*.sql.bak
+ali_supplier_*.sql
+*.bak-*
